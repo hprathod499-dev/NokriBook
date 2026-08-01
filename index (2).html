@@ -1,0 +1,1401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Nokri Book</title>
+<link rel="manifest" href="./manifest.json" />
+<link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png" />
+<link rel="icon" type="image/png" sizes="16x16" href="./favicon-16.png" />
+<link rel="icon" href="./icon-192.png" />
+<link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+<meta name="theme-color" content="#0E1620" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Nokri Book" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&family=Noto+Sans+Gujarati:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; font-family: 'Inter', sans-serif; background: #F1F3F0; color: #16202B; }
+  .gu { font-family: 'Noto Sans Gujarati', 'Inter', sans-serif; }
+  .mono { font-family: 'IBM Plex Mono', monospace; }
+  .disp { font-family: 'Space Grotesk', sans-serif; }
+  button { cursor: pointer; font-family: inherit; }
+  input[type=text], input[type=date], input[type=month], input[type=number] {
+    font-family: inherit; border: 1px solid #DEE3DF; border-radius: 6px;
+    padding: 7px 10px; font-size: 13px; background: #fff; color: #16202B;
+  }
+  input:focus { outline: 2px solid #D98E2B55; border-color: #D98E2B; }
+  select { font-family: inherit; }
+  @media (max-width: 860px) {
+    .sidebar { width: 100% !important; flex-direction: row !important; overflow-x: auto; }
+    .app-shell { flex-direction: column !important; }
+    .main-panel { padding: 18px 14px !important; }
+    table { font-size: 12px !important; }
+  }
+</style>
+</head>
+<body>
+<div id="root">
+  <div style="padding:3rem;text-align:center;color:#5B6B7A;">Loading…</div>
+</div>
+
+<!-- ============================================================
+     STEP 1: Paste your Firebase config below (see setup guide).
+     This is the ONLY part you need to edit.
+     ============================================================ -->
+<script>
+  window.FIREBASE_CONFIG = {
+    apiKey: "AIzaSyDhTfj_pmgKsA-A3Eq2clt9glswbqX8Cnw",
+    authDomain: "duty-roaster-944b9.firebaseapp.com",
+    projectId: "duty-roaster-944b9",
+    storageBucket: "duty-roaster-944b9.firebasestorage.app",
+    messagingSenderId: "315144752493",
+    appId: "1:315144752493:web:494fee1d0a377a8bc69e64"
+  };
+</script>
+<!-- ============================================================ -->
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+
+<script type="text/babel" data-type="module">
+const { useState, useEffect, useMemo, useCallback, useRef } = React;
+
+firebase.initializeApp(window.FIREBASE_CONFIG);
+const db = firebase.firestore();
+const DOC_REF = db.collection("duty-roster").doc("data");
+
+// ---------- Defaults (only used the very first time the app runs) ----------
+const DEFAULT_CATEGORIES = [
+  { id: "112", label: "112 emergency" },
+  { id: "kedi", label: "Kedi party" },
+  { id: "highcourt", label: "High court" },
+  { id: "bandobast", label: "Bandobast" },
+  { id: "farbandobast", label: "Far bandobast" },
+  { id: "tapal", label: "Tapal" },
+  { id: "fsljgd", label: "FSL JGD" },
+  { id: "fslgnr", label: "FSL GNR" },
+  { id: "compcharge", label: "COMP charge" },
+  { id: "pso", label: "PSO" },
+];
+
+const DEFAULT_LEAVE_TYPES = [
+  { id: "leave1", label: "Casual Leave", indefinite: false },
+  { id: "leave2", label: "Sick Leave", indefinite: true },
+  { id: "leave3", label: "Earned Leave", indefinite: false },
+  { id: "leave4", label: "Emergency Leave", indefinite: false },
+];
+const DEFAULT_OUTSTATION_TYPES = [
+  { id: "out1", label: "Training" },
+  { id: "out2", label: "Court Duty" },
+  { id: "out3", label: "VIP Bandobast" },
+  { id: "out4", label: "Other Outstation" },
+];
+
+const seed112 = [
+  { number: "101", name: "ગાયત્રીબેન વાળા", lastDuty: "2026-07-20" },
+  { number: "102", name: "દયાબેન ચાવડા", lastDuty: "2026-07-27" },
+  { number: "103", name: "સંગીતાબેન બાંભણીયા", lastDuty: "2026-07-18" },
+  { number: "104", name: "વૈશાલીબેન ખેતરીયા", lastDuty: "2026-07-22" },
+  { number: "105", name: "કિરણબેન દુધરેજીયા", lastDuty: "2026-07-20" },
+  { number: "106", name: "નયનાબેન રાઠોડ", lastDuty: "2026-07-27" },
+  { number: "107", name: "પ્રજ્ઞાબેન સોજીત્રા", lastDuty: "2026-07-04" },
+  { number: "108", name: "નીતાબેન રાઠોડ", lastDuty: "2026-07-27" },
+  { number: "109", name: "કિરણબેન રેણુકા", lastDuty: "2026-07-23" },
+];
+
+function uid() { return Math.random().toString(36).slice(2, 10); }
+function todayStr() { return new Date().toISOString().slice(0, 10); }
+function daysBetween(a, b) {
+  const ms = new Date(b + "T00:00:00") - new Date(a + "T00:00:00");
+  return Math.max(0, Math.round(ms / 86400000));
+}
+function slugify(label) {
+  return (label || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "cat";
+}
+// History entries used to be plain "YYYY-MM-DD" strings. They are now
+// { date, ts } objects so entries made on the same date can still be
+// ordered correctly (newest first). These helpers read either shape.
+function historyDate(entry) { return typeof entry === "string" ? entry : entry.date; }
+function historyTs(entry) { return typeof entry === "string" ? 0 : (entry.ts || 0); }
+
+// ---------- Gujarati font for PDF export ----------
+// jsPDF's built-in fonts can't render Gujarati script (names show as boxes/blank).
+// We fetch a Unicode Gujarati TTF once, register it with jsPDF, and use it only
+// for the "Name" column so headers/dates stay on the normal font.
+let _gujaratiFontBase64 = null;
+async function loadGujaratiFont() {
+  if (_gujaratiFontBase64) return _gujaratiFontBase64;
+  const res = await fetch("https://cdn.jsdelivr.net/gh/openmaptiles/fonts/noto-sans/NotoSansGujarati-Regular.ttf");
+  if (!res.ok) throw new Error("Could not download Gujarati font");
+  const buf = await res.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  }
+  _gujaratiFontBase64 = btoa(binary);
+  return _gujaratiFontBase64;
+}
+
+function buildInitialData() {
+  const staff = {};
+  seed112.forEach((p) => { staff[p.number] = { number: p.number, name: p.name, unavailable: null }; });
+  const membership = {};
+  DEFAULT_CATEGORIES.forEach((c) => {
+    membership[c.id] = c.id === "112"
+      ? seed112.map((p) => ({ number: p.number, lastDuty: p.lastDuty, history: [], skip: false }))
+      : [];
+  });
+  return { v: 2, staff, categories: DEFAULT_CATEGORIES, membership, leaveTypes: DEFAULT_LEAVE_TYPES, outstationTypes: DEFAULT_OUTSTATION_TYPES, recycleBin: [] };
+}
+
+// Converts the old per-category schema (name/status stored directly on each
+// row, no shared identity) into the new schema (one global staff record per
+// person, referenced by workplace number, shared across every work type).
+function migrateOldRoster(oldRoster) {
+  const staff = {};
+  const membership = {};
+  const nameToNumber = {};
+  let counter = 1;
+  Object.keys(oldRoster).forEach((catId) => {
+    const list = oldRoster[catId] || [];
+    membership[catId] = list.map((p) => {
+      let num = nameToNumber[p.name];
+      if (!num) {
+        num = "M" + String(counter++).padStart(3, "0");
+        nameToNumber[p.name] = num;
+        staff[num] = {
+          number: num,
+          name: p.name,
+          // Best-effort carry-over: an old "Leave" status becomes a 30-day
+          // leave starting today. Please correct the actual dates in
+          // Manage Staff.
+          unavailable: p.status === "Leave" ? { type: "Leave", from: todayStr(), to: todayStr() } : null,
+        };
+      }
+      return { number: num, lastDuty: p.lastDuty, history: p.history || [], skip: p.status === "Skip" };
+    });
+  });
+  const categories = DEFAULT_CATEGORIES.filter((c) => oldRoster[c.id]).length
+    ? DEFAULT_CATEGORIES.map((c) => ({ id: c.id, label: c.label }))
+    : DEFAULT_CATEGORIES;
+  // include any category ids present in old data but not in our default list
+  Object.keys(oldRoster).forEach((catId) => {
+    if (!categories.find((c) => c.id === catId)) categories.push({ id: catId, label: catId });
+  });
+  return { v: 2, staff, categories, membership, leaveTypes: DEFAULT_LEAVE_TYPES, outstationTypes: DEFAULT_OUTSTATION_TYPES, recycleBin: [] };
+}
+
+const STATUS_STYLE = {
+  Present: { bg: "#EAF3DE", fg: "#3B6D11", border: "#C0DD97" },
+  Skip: { bg: "#F1EFE8", fg: "#5F5E5A", border: "#D3D1C7" },
+  Leave: { bg: "#DCE8F5", fg: "#1D4E89", border: "#A9C6E8" },
+  Outstation: { bg: "#EFE5F7", fg: "#6B3FA0", border: "#D3B8EC" },
+};
+
+// "kind" is always "Leave" or "Outstation" (drives status colour + the
+// Present/Skip filter logic). "label" is the specific, admin-editable
+// sub-type (e.g. "Sick Leave") shown to the user. Old records saved before
+// sub-types existed only have `type`, which is used as a fallback for both.
+function unavailKind(u) { return (u && (u.kind || u.type)) || null; }
+function unavailLabel(data, u) {
+  if (!u) return "";
+  const kind = unavailKind(u);
+  const list = kind === "Leave" ? data.leaveTypes : kind === "Outstation" ? data.outstationTypes : null;
+  const found = list && u.typeId && list.find((t) => t.id === u.typeId);
+  return found ? found.label : (u.subtype || kind || "");
+}
+
+function effectiveStatus(staffRec, membEntry) {
+  const today = todayStr();
+  if (staffRec && staffRec.unavailable) {
+    const { from, to } = staffRec.unavailable;
+    // to === null/undefined means an indefinite (open-ended) period — it
+    // stays active until someone manually ends it, no matter the date.
+    if (today >= from && (!to || today <= to)) return unavailKind(staffRec.unavailable);
+  }
+  return membEntry.skip ? "Skip" : "Present";
+}
+
+// Shared by the Home dashboard and the per-work-type view so ranking logic
+// never drifts between the two screens.
+function computeRoster(data, catId) {
+  const membership = (data.membership && data.membership[catId]) || [];
+  const today = todayStr();
+  const withInfo = membership.map((m) => {
+    const staffRec = data.staff[m.number] || { number: m.number, name: "(unknown)", unavailable: null };
+    const status = effectiveStatus(staffRec, m);
+    const statusLabel = (status === "Leave" || status === "Outstation") ? unavailLabel(data, staffRec.unavailable) : status;
+    return { ...m, name: staffRec.name, staffRec, waiting: daysBetween(m.lastDuty, today), status, statusLabel };
+  });
+  const eligible = withInfo.filter((p) => p.status === "Present").sort((a, b) => b.waiting - a.waiting);
+  const rankMap = {};
+  eligible.forEach((p, i) => (rankMap[p.number] = i + 1));
+  return withInfo.map((p) => ({ ...p, rank: rankMap[p.number] || null })).sort((a, b) => {
+    if (a.rank && b.rank) return a.rank - b.rank;
+    if (a.rank) return -1;
+    if (b.rank) return 1;
+    return b.waiting - a.waiting;
+  });
+}
+
+function DutyRoster() {
+  const [data, setData] = useState(null);
+  const [view, setView] = useState({ mode: "home" }); // home | category | staff | report
+  const [toast, setToast] = useState(null);
+  const [connError, setConnError] = useState(false);
+  const [returnNotices, setReturnNotices] = useState([]);
+  const notifiedRef = useRef(new Set());
+  const migratedRef = useRef(false);
+  const [undoStack, setUndoStack] = useState([]);
+  const [redoStack, setRedoStack] = useState([]);
+  const MAX_HISTORY_STATES = 40;
+
+  useEffect(() => {
+    const unsub = DOC_REF.onSnapshot(
+      (snap) => {
+        if (snap.exists) {
+          const d = snap.data();
+          if (d.v === 2) {
+            if (!d.leaveTypes || !d.outstationTypes || !d.recycleBin) {
+              const withDefaults = {
+                ...d,
+                leaveTypes: d.leaveTypes || DEFAULT_LEAVE_TYPES,
+                outstationTypes: d.outstationTypes || DEFAULT_OUTSTATION_TYPES,
+                recycleBin: d.recycleBin || [],
+              };
+              setData(withDefaults);
+              DOC_REF.set(withDefaults).catch(() => {});
+            } else {
+              setData(d);
+            }
+          } else if (d.roster && !migratedRef.current) {
+            migratedRef.current = true;
+            const migrated = migrateOldRoster(d.roster);
+            DOC_REF.set(migrated).catch(() => {});
+            setData(migrated);
+          }
+        } else {
+          const initial = buildInitialData();
+          DOC_REF.set(initial).catch(() => {});
+          setData(initial);
+        }
+      },
+      (err) => { console.error(err); setConnError(true); setData(buildInitialData()); }
+    );
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    if (view.mode === "category" && data && !view.catId) {
+      const first = (data.categories || [])[0];
+      if (first) setView({ mode: "category", catId: first.id });
+    }
+  }, [data, view]);
+
+  // Auto-expire leave / outstation and surface a "back on duty" notice.
+  useEffect(() => {
+    if (!data) return;
+    const today = todayStr();
+    const expired = [];
+    const nextStaff = { ...data.staff };
+    Object.keys(nextStaff).forEach((num) => {
+      const rec = nextStaff[num];
+      if (rec.unavailable && rec.unavailable.to && rec.unavailable.to < today) {
+        const key = num + rec.unavailable.from + rec.unavailable.to;
+        if (!notifiedRef.current.has(key)) {
+          notifiedRef.current.add(key);
+          expired.push({ name: rec.name, type: unavailKind(rec.unavailable) });
+        }
+        nextStaff[num] = { ...rec, unavailable: null };
+      }
+    });
+    if (expired.length) {
+      setReturnNotices((prev) => [...prev, ...expired]);
+      DOC_REF.set({ ...data, staff: nextStaff }).catch(() => {});
+    }
+  }, [data]);
+
+  // Every mutation in the app funnels through here, so this is the single
+  // choke point where we snapshot the previous state for Undo. Undo/redo
+  // history is kept locally in this browser tab only (not synced via
+  // Firestore) — each device's misclick recovery is its own.
+  const persist = (next) => {
+    setUndoStack((prev) => {
+      const stack = [...prev, data];
+      return stack.length > MAX_HISTORY_STATES ? stack.slice(stack.length - MAX_HISTORY_STATES) : stack;
+    });
+    setRedoStack([]);
+    setData(next);
+    DOC_REF.set(next).catch((e) => console.error(e));
+  };
+
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 2200); };
+
+  const undo = useCallback(() => {
+    setUndoStack((stack) => {
+      if (stack.length === 0) return stack;
+      const prevState = stack[stack.length - 1];
+      setRedoStack((r) => [...r, data]);
+      setData(prevState);
+      DOC_REF.set(prevState).catch((e) => console.error(e));
+      showToast("Undone — last change reverted");
+      return stack.slice(0, -1);
+    });
+  }, [data]);
+
+  const redo = useCallback(() => {
+    setRedoStack((stack) => {
+      if (stack.length === 0) return stack;
+      const nextState = stack[stack.length - 1];
+      setUndoStack((u) => [...u, data]);
+      setData(nextState);
+      DOC_REF.set(nextState).catch((e) => console.error(e));
+      showToast("Redone");
+      return stack.slice(0, -1);
+    });
+  }, [data]);
+
+  // Ctrl/Cmd+Z to undo, Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y to redo — skipped
+  // while typing in a text field so it doesn't fight the browser's own
+  // per-input undo.
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      const tag = (e.target && e.target.tagName) || "";
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const key = e.key.toLowerCase();
+      if (key === "z" && !e.shiftKey) { e.preventDefault(); undo(); }
+      else if ((key === "z" && e.shiftKey) || key === "y") { e.preventDefault(); redo(); }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [undo, redo]);
+
+  // ---------- recycle bin ----------
+  const MAX_RECYCLE_ITEMS = 300;
+  const withRecycled = (base, item) => {
+    const entry = { id: uid(), deletedAt: todayStr(), ts: Date.now(), ...item };
+    const bin = [entry, ...((base.recycleBin) || [])].slice(0, MAX_RECYCLE_ITEMS);
+    return { ...base, recycleBin: bin };
+  };
+  const restoreFromRecycleBin = (id) => {
+    if (!data) return;
+    const item = (data.recycleBin || []).find((r) => r.id === id);
+    if (!item) return;
+    const nextBin = (data.recycleBin || []).filter((r) => r.id !== id);
+    let next = { ...data, recycleBin: nextBin };
+    if (item.type === "category") {
+      const exists = next.categories.find((c) => c.id === item.payload.category.id);
+      next.categories = exists ? next.categories : [...next.categories, item.payload.category];
+      next.membership = { ...next.membership, [item.payload.category.id]: item.payload.membership };
+    } else if (item.type === "staff") {
+      next.staff = { ...next.staff, [item.payload.staffRecord.number]: item.payload.staffRecord };
+      const nextMembership = { ...next.membership };
+      (item.payload.memberships || []).forEach(({ catId, entry }) => {
+        if (!nextMembership[catId]) return;
+        const already = nextMembership[catId].some((m) => m.number === entry.number);
+        nextMembership[catId] = already ? nextMembership[catId] : [...nextMembership[catId], entry];
+      });
+      next.membership = nextMembership;
+    } else if (item.type === "membership") {
+      const list = next.membership[item.payload.catId] || [];
+      const already = list.some((m) => m.number === item.payload.entry.number);
+      next.membership = { ...next.membership, [item.payload.catId]: already ? list : [...list, item.payload.entry] };
+    } else if (item.type === "history") {
+      const list = next.membership[item.payload.catId] || [];
+      next.membership = {
+        ...next.membership,
+        [item.payload.catId]: list.map((m) => {
+          const snap = (item.payload.snapshot || []).find((s) => s.number === m.number);
+          return snap ? { ...m, history: snap.history } : m;
+        }),
+      };
+    }
+    persist(next);
+    showToast(`Restored "${item.label}"`);
+  };
+  const deleteFromRecycleBinForever = (id) => {
+    if (!data) return;
+    if (!window.confirm("Delete this permanently? It cannot be restored after this.")) return;
+    persist({ ...data, recycleBin: (data.recycleBin || []).filter((r) => r.id !== id) });
+  };
+  const emptyRecycleBin = () => {
+    if (!data) return;
+    if (!window.confirm("Empty the recycle bin? Everything in it will be permanently deleted.")) return;
+    persist({ ...data, recycleBin: [] });
+    showToast("Recycle bin emptied");
+  };
+
+  // ---------- category / membership mutations ----------
+  const addCategory = (label) => {
+    const clean = (label || "").trim();
+    if (!clean || !data) return;
+    const id = slugify(clean) + "-" + uid().slice(0, 4);
+    persist({
+      ...data,
+      categories: [...data.categories, { id, label: clean }],
+      membership: { ...data.membership, [id]: [] },
+    });
+    setView({ mode: "category", catId: id });
+    showToast(`Added work type "${clean}"`);
+  };
+  const renameCategory = (id) => {
+    const cur = data.categories.find((c) => c.id === id);
+    const next = window.prompt("Rename work type:", cur ? cur.label : "");
+    if (!next || !next.trim() || !data) return;
+    persist({ ...data, categories: data.categories.map((c) => c.id === id ? { ...c, label: next.trim() } : c) });
+  };
+  const deleteCategory = (id) => {
+    const cur = data.categories.find((c) => c.id === id);
+    if (!window.confirm(`Delete work type "${cur ? cur.label : id}"? It will move to the Recycle bin and can be restored later.`)) return;
+    const nextCats = data.categories.filter((c) => c.id !== id);
+    const nextMembership = { ...data.membership };
+    const removedMembership = nextMembership[id] || [];
+    delete nextMembership[id];
+    const recycled = withRecycled({ ...data, categories: nextCats, membership: nextMembership }, {
+      type: "category",
+      label: cur ? cur.label : id,
+      payload: { category: cur || { id, label: id }, membership: removedMembership },
+    });
+    persist(recycled);
+    showToast(`Moved "${cur ? cur.label : id}" to Recycle bin`);
+    if (view.catId === id) setView({ mode: "category", catId: nextCats[0] ? nextCats[0].id : null });
+  };
+
+  const updateMembership = (catId, updater) => {
+    if (!data) return;
+    const list = data.membership[catId] || [];
+    persist({ ...data, membership: { ...data.membership, [catId]: updater(list) } });
+  };
+
+  const addToCategory = (catId, number, name, date) => {
+    const num = (number || "").trim();
+    const cleanName = (name || "").trim();
+    if (!num) { showToast("Enter a workplace number"); return; }
+    const existing = data.staff[num];
+    if (!existing && !cleanName) { showToast("New number — enter the staff name too"); return; }
+    const already = (data.membership[catId] || []).some((m) => m.number === num);
+    if (already) { showToast("Already listed in this work type"); return; }
+    const nextStaff = existing ? data.staff : { ...data.staff, [num]: { number: num, name: cleanName, unavailable: null } };
+    const nextMembership = {
+      ...data.membership,
+      [catId]: [...(data.membership[catId] || []), { number: num, lastDuty: date || todayStr(), history: [], skip: false }],
+    };
+    persist({ ...data, staff: nextStaff, membership: nextMembership });
+    showToast(`${existing ? existing.name : cleanName} added`);
+  };
+
+  const clearCategoryHistory = (catId) => {
+    const cur = data.categories.find((c) => c.id === catId);
+    const label = cur ? cur.label : catId;
+    if (!window.confirm(`Clear all duty history for "${label}"? Last duty dates and the roster stay the same — the cleared entries move to the Recycle bin and can be restored.`)) return;
+    const list = data.membership[catId] || [];
+    const nextMembership = { ...data.membership, [catId]: list.map((m) => ({ ...m, history: [] })) };
+    const recycled = withRecycled({ ...data, membership: nextMembership }, {
+      type: "history",
+      label: `${label} history (${list.reduce((n, m) => n + (m.history || []).length, 0)} entries)`,
+      payload: { catId, catLabel: label, snapshot: list },
+    });
+    persist(recycled);
+    showToast(`History cleared for "${label}" — moved to Recycle bin`);
+  };
+  const removeFromCategory = (catId, number) => {
+    const cur = data.categories.find((c) => c.id === catId);
+    const label = cur ? cur.label : catId;
+    const list = data.membership[catId] || [];
+    const entry = list.find((m) => m.number === number);
+    if (!entry) return;
+    const staffRec = data.staff[number];
+    const nextMembership = { ...data.membership, [catId]: list.filter((m) => m.number !== number) };
+    const recycled = withRecycled({ ...data, membership: nextMembership }, {
+      type: "membership",
+      label: `${staffRec ? staffRec.name : number} — ${label}`,
+      payload: { catId, catLabel: label, entry },
+    });
+    persist(recycled);
+    showToast(`Removed from "${label}" — moved to Recycle bin`);
+  };
+  const setSkip = (catId, number, skip) => updateMembership(catId, (list) => list.map((m) => m.number === number ? { ...m, skip } : m));
+  const setLastDuty = (catId, number, date) => updateMembership(catId, (list) => list.map((m) => m.number === number ? { ...m, lastDuty: date } : m));
+  const assignDuty = (catId, number, name) => {
+    const today = todayStr();
+    const entry = { date: today, ts: Date.now() };
+    updateMembership(catId, (list) => list.map((m) => m.number === number ? { ...m, lastDuty: today, history: [...(m.history || []), entry] } : m));
+    showToast(`Duty assigned to ${name}`);
+  };
+
+  // ---------- staff directory mutations ----------
+  const createStaff = (number, name) => {
+    const num = (number || "").trim();
+    const cleanName = (name || "").trim();
+    if (!num || !cleanName) { showToast("Enter both number and name"); return; }
+    if (data.staff[num]) { showToast("That number is already in use"); return; }
+    persist({ ...data, staff: { ...data.staff, [num]: { number: num, name: cleanName, unavailable: null } } });
+    showToast(`${cleanName} added to staff directory`);
+  };
+  const renameStaff = (number) => {
+    const cur = data.staff[number];
+    const next = window.prompt("Edit name:", cur ? cur.name : "");
+    if (!next || !next.trim()) return;
+    persist({ ...data, staff: { ...data.staff, [number]: { ...cur, name: next.trim() } } });
+  };
+  const deleteStaffGlobally = (number) => {
+    const cur = data.staff[number];
+    if (!window.confirm(`Remove ${cur ? cur.name : number} from every work type? They'll move to the Recycle bin and can be restored later.`)) return;
+    const nextStaff = { ...data.staff };
+    delete nextStaff[number];
+    const nextMembership = {};
+    const removedMemberships = [];
+    Object.keys(data.membership).forEach((catId) => {
+      nextMembership[catId] = data.membership[catId].filter((m) => {
+        if (m.number === number) { removedMemberships.push({ catId, entry: m }); return false; }
+        return true;
+      });
+    });
+    const recycled = withRecycled({ ...data, staff: nextStaff, membership: nextMembership }, {
+      type: "staff",
+      label: cur ? cur.name : number,
+      payload: { staffRecord: cur || { number, name: number, unavailable: null }, memberships: removedMemberships },
+    });
+    persist(recycled);
+    showToast(`Moved ${cur ? cur.name : number} to Recycle bin`);
+  };
+  const setUnavailable = (number, kind, typeId, from, to) => {
+    const list = kind === "Leave" ? data.leaveTypes : data.outstationTypes;
+    const found = (list || []).find((t) => t.id === typeId);
+    const label = found ? found.label : kind;
+    const isIndefinite = kind === "Leave" && !!(found && found.indefinite);
+    if (!from) { showToast("Pick a start date"); return; }
+    if (!isIndefinite && (!to || to < from)) { showToast("Pick a valid date range"); return; }
+    const finalTo = isIndefinite ? null : to;
+    persist({ ...data, staff: { ...data.staff, [number]: { ...data.staff[number], unavailable: { kind, typeId, from, to: finalTo } } } });
+    showToast(`${data.staff[number].name} marked ${label.toLowerCase()}${finalTo ? " until " + finalTo : " — no end date"}`);
+  };
+  const clearUnavailable = (number) => {
+    persist({ ...data, staff: { ...data.staff, [number]: { ...data.staff[number], unavailable: null } } });
+  };
+  const renameLeaveType = (id) => {
+    const cur = (data.leaveTypes || []).find((t) => t.id === id);
+    const next = window.prompt("Rename leave type:", cur ? cur.label : "");
+    if (!next || !next.trim()) return;
+    persist({ ...data, leaveTypes: (data.leaveTypes || DEFAULT_LEAVE_TYPES).map((t) => t.id === id ? { ...t, label: next.trim() } : t) });
+  };
+  const renameOutstationType = (id) => {
+    const cur = (data.outstationTypes || []).find((t) => t.id === id);
+    const next = window.prompt("Rename outstation type:", cur ? cur.label : "");
+    if (!next || !next.trim()) return;
+    persist({ ...data, outstationTypes: (data.outstationTypes || DEFAULT_OUTSTATION_TYPES).map((t) => t.id === id ? { ...t, label: next.trim() } : t) });
+  };
+  const addLeaveType = (label, indefinite) => {
+    const clean = (label || "").trim();
+    if (!clean || !data) { showToast("Enter a leave type name"); return; }
+    const id = "leave-" + uid();
+    persist({ ...data, leaveTypes: [...(data.leaveTypes || DEFAULT_LEAVE_TYPES), { id, label: clean, indefinite: !!indefinite }] });
+    showToast(`Added leave type "${clean}"`);
+  };
+  const deleteLeaveType = (id) => {
+    const list = data.leaveTypes || DEFAULT_LEAVE_TYPES;
+    const cur = list.find((t) => t.id === id);
+    if (list.length <= 1) { showToast("Keep at least one leave type"); return; }
+    if (!window.confirm(`Delete leave type "${cur ? cur.label : id}"? Anyone currently marked with it will just show as "Leave".`)) return;
+    persist({ ...data, leaveTypes: list.filter((t) => t.id !== id) });
+    showToast(`Deleted leave type "${cur ? cur.label : id}"`);
+  };
+  const toggleLeaveTypeIndefinite = (id) => {
+    const list = data.leaveTypes || DEFAULT_LEAVE_TYPES;
+    persist({ ...data, leaveTypes: list.map((t) => t.id === id ? { ...t, indefinite: !t.indefinite } : t) });
+  };
+  const addOutstationType = (label) => {
+    const clean = (label || "").trim();
+    if (!clean || !data) { showToast("Enter an outstation type name"); return; }
+    const id = "out-" + uid();
+    persist({ ...data, outstationTypes: [...(data.outstationTypes || DEFAULT_OUTSTATION_TYPES), { id, label: clean }] });
+    showToast(`Added outstation type "${clean}"`);
+  };
+  const deleteOutstationType = (id) => {
+    const list = data.outstationTypes || DEFAULT_OUTSTATION_TYPES;
+    const cur = list.find((t) => t.id === id);
+    if (list.length <= 1) { showToast("Keep at least one outstation type"); return; }
+    if (!window.confirm(`Delete outstation type "${cur ? cur.label : id}"? Anyone currently marked with it will just show as "Outstation".`)) return;
+    persist({ ...data, outstationTypes: list.filter((t) => t.id !== id) });
+    showToast(`Deleted outstation type "${cur ? cur.label : id}"`);
+  };
+
+  if (!data) return <div style={{padding:"3rem",textAlign:"center",color:"#5B6B7A"}}>Loading roster…</div>;
+
+  return (
+    <div style={{ minHeight: "100vh" }}>
+      {connError && (
+        <div style={{ background: "#FCEBEB", color: "#A32D2D", padding: "8px 16px", fontSize: 13, textAlign: "center" }}>
+          Couldn't connect to the shared database — check the Firebase config at the top of this file. Showing local demo data for now.
+        </div>
+      )}
+      {returnNotices.map((n, i) => (
+        <div key={i} style={{ background: "#DCE8F5", color: "#1D4E89", padding: "9px 16px", fontSize: 13, textAlign: "center", display: "flex", justifyContent: "center", gap: 10, alignItems: "center" }}>
+          <span className="gu">🔔 {n.name}'s {n.type.toLowerCase()} period has ended — back on duty.</span>
+          <button onClick={() => setReturnNotices((prev) => prev.filter((_, idx) => idx !== i))} style={{ background: "transparent", border: "none", color: "#1D4E89", fontWeight: 700 }}>✕</button>
+        </div>
+      ))}
+
+      <div className="app-shell" style={{ display: "flex", minHeight: "100vh" }}>
+        <Sidebar data={data} view={view} setView={setView} addCategory={addCategory} renameCategory={renameCategory} deleteCategory={deleteCategory} />
+
+        <div className="main-panel" style={{ flex: 1, padding: "28px 36px", maxWidth: 1040 }}>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 16 }}>
+            <button onClick={undo} disabled={undoStack.length === 0} title="Undo last change (Ctrl+Z)"
+              style={undoRedoBtn(undoStack.length > 0)}>↶ Undo{undoStack.length ? ` (${undoStack.length})` : ""}</button>
+            <button onClick={redo} disabled={redoStack.length === 0} title="Redo (Ctrl+Shift+Z)"
+              style={undoRedoBtn(redoStack.length > 0)}>↷ Redo{redoStack.length ? ` (${redoStack.length})` : ""}</button>
+          </div>
+          {view.mode === "home" && (
+            <HomeView data={data} assignDuty={assignDuty} goToCategory={(catId) => setView({ mode: "category", catId })} />
+          )}
+          {view.mode === "category" && view.catId && (
+            <CategoryView
+              data={data} catId={view.catId}
+              addToCategory={addToCategory} removeFromCategory={removeFromCategory}
+              setSkip={setSkip} setLastDuty={setLastDuty} assignDuty={assignDuty}
+              clearCategoryHistory={clearCategoryHistory}
+              undo={undo} redo={redo} canUndo={undoStack.length > 0} canRedo={redoStack.length > 0}
+            />
+          )}
+          {view.mode === "staff" && (
+            <StaffView
+              data={data} createStaff={createStaff} renameStaff={renameStaff}
+              deleteStaffGlobally={deleteStaffGlobally} setUnavailable={setUnavailable} clearUnavailable={clearUnavailable}
+              renameLeaveType={renameLeaveType} renameOutstationType={renameOutstationType}
+              addLeaveType={addLeaveType} deleteLeaveType={deleteLeaveType} toggleLeaveTypeIndefinite={toggleLeaveTypeIndefinite}
+              addOutstationType={addOutstationType} deleteOutstationType={deleteOutstationType}
+            />
+          )}
+          {view.mode === "report" && <ReportView data={data} />}
+          {view.mode === "recycle" && (
+            <RecycleBinView
+              data={data} onRestore={restoreFromRecycleBin}
+              onDeleteForever={deleteFromRecycleBinForever} onEmpty={emptyRecycleBin}
+            />
+          )}
+        </div>
+      </div>
+
+      {toast && (
+        <div className="gu" style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: "#16202B", color: "#fff", padding: "10px 18px", borderRadius: 8, fontSize: 13 }}>{toast}</div>
+      )}
+    </div>
+  );
+}
+
+function Sidebar({ data, view, setView, addCategory, renameCategory, deleteCategory }) {
+  const [editing, setEditing] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [newLabel, setNewLabel] = useState("");
+
+  return (
+    <div className="sidebar" style={{ width: 230, background: "#0E1620", color: "#EAEDEB", flexShrink: 0, display: "flex", flexDirection: "column" }}>
+      <div style={{ padding: "20px 18px 14px", borderBottom: "1px solid #1B2733" }}>
+        <div className="disp" style={{ fontSize: 15, fontWeight: 700 }}>Nokri Book</div>
+        <div style={{ fontSize: 11, color: "#8FA0AC", marginTop: 2 }}>Fair rotation console</div>
+      </div>
+
+      <div style={{ padding: "8px 0", borderBottom: "1px solid #1B2733" }}>
+        <button onClick={() => setView({ mode: "home" })} style={navBtn(view.mode === "home")}>🏠 Today's duty</button>
+      </div>
+
+      <div style={{ padding: "8px 0", flex: 1, overflowY: "auto" }}>
+        {(data.categories || []).map((c) => {
+          const count = (data.membership[c.id] || []).length;
+          const active = view.mode === "category" && c.id === view.catId;
+          return (
+            <div key={c.id} style={{ display: "flex", alignItems: "center" }}>
+              <button onClick={() => setView({ mode: "category", catId: c.id })} style={{
+                flex: 1, textAlign: "left", background: active ? "#1B2733" : "transparent",
+                border: "none", borderLeft: active ? "3px solid #D98E2B" : "3px solid transparent",
+                color: active ? "#fff" : "#B7C2CA", padding: "9px 16px 9px 15px", fontSize: 13,
+                fontWeight: active ? 600 : 400, display: "flex", justifyContent: "space-between", alignItems: "center",
+              }}>
+                <span>{c.label}</span>
+                <span className="mono" style={{ fontSize: 11, color: "#6B7A85" }}>{count}</span>
+              </button>
+              {editing && (
+                <div style={{ display: "flex", gap: 2, paddingRight: 8 }}>
+                  <button onClick={() => renameCategory(c.id)} title="Rename" style={{ background: "transparent", border: "none", color: "#8FA0AC", fontSize: 12 }}>✎</button>
+                  <button onClick={() => deleteCategory(c.id)} title="Delete" style={{ background: "transparent", border: "none", color: "#D98E8E", fontSize: 12 }}>✕</button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {adding ? (
+          <div style={{ padding: "8px 16px", display: "flex", gap: 6 }}>
+            <input type="text" autoFocus value={newLabel} placeholder="New work type"
+              onChange={(e) => setNewLabel(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { addCategory(newLabel); setNewLabel(""); setAdding(false); } if (e.key === "Escape") setAdding(false); }}
+              style={{ width: "100%", fontSize: 12 }} />
+            <button onClick={() => { addCategory(newLabel); setNewLabel(""); setAdding(false); }} style={{ background: "#D98E2B", color: "#fff", border: "none", borderRadius: 6, padding: "0 8px", fontSize: 12 }}>+</button>
+          </div>
+        ) : (
+          <button onClick={() => setAdding(true)} style={{ width: "100%", textAlign: "left", background: "transparent", border: "none", color: "#8FA0AC", padding: "9px 16px", fontSize: 12.5 }}>+ Add work type</button>
+        )}
+        <button onClick={() => setEditing((v) => !v)} style={{ width: "100%", textAlign: "left", background: "transparent", border: "none", color: "#6B7A85", padding: "6px 16px", fontSize: 11.5 }}>
+          {editing ? "Done editing" : "Edit work types"}
+        </button>
+      </div>
+
+      <div style={{ borderTop: "1px solid #1B2733", padding: "8px 0" }}>
+        <button onClick={() => setView({ mode: "staff" })} style={navBtn(view.mode === "staff")}>👥 Manage staff</button>
+        <button onClick={() => setView({ mode: "report" })} style={navBtn(view.mode === "report")}>📄 Monthly report</button>
+        <button onClick={() => setView({ mode: "recycle" })} style={{ ...navBtn(view.mode === "recycle"), display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>🗑️ Recycle bin</span>
+          {(data.recycleBin || []).length > 0 && (
+            <span className="mono" style={{ fontSize: 10.5, background: "#1B2733", color: "#D98E2B", borderRadius: 10, padding: "1px 7px" }}>{(data.recycleBin || []).length}</span>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+function undoRedoBtn(enabled) {
+  return {
+    background: "#fff", color: enabled ? "#16202B" : "#B4B9B5",
+    border: "1px solid " + (enabled ? "#DEE3DF" : "#EEF0ED"), borderRadius: 7,
+    padding: "6px 12px", fontSize: 12.5, fontWeight: 600, cursor: enabled ? "pointer" : "default",
+  };
+}
+function navBtn(active) {
+  return { width: "100%", textAlign: "left", background: active ? "#1B2733" : "transparent", border: "none",
+    borderLeft: active ? "3px solid #D98E2B" : "3px solid transparent", color: active ? "#fff" : "#B7C2CA",
+    padding: "9px 16px 9px 15px", fontSize: 13, fontWeight: active ? 600 : 400 };
+}
+
+function HomeView({ data, assignDuty, goToCategory }) {
+  const today = todayStr();
+  const cards = useMemo(() => (data.categories || []).map((c) => {
+    const roster = computeRoster(data, c.id);
+    const doneToday = roster.find((p) => p.lastDuty === today);
+    const nextUp = roster.find((p) => p.rank === 1);
+    return { cat: c, doneToday, nextUp, total: roster.length };
+  }), [data]);
+
+  return (
+    <React.Fragment>
+      <h1 className="disp" style={{ fontSize: 22, fontWeight: 700, margin: "0 0 4px" }}>Today's duty</h1>
+      <p style={{ fontSize: 13, color: "#5B6B7A", margin: "0 0 20px" }}>
+        {new Date().toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" })} — every work type at a glance.
+      </p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))", gap: 14 }}>
+        {cards.map(({ cat, doneToday, nextUp, total }) => (
+          <div key={cat.id} style={{ background: "#fff", border: "1px solid #DEE3DF", borderRadius: 10, padding: "16px 18px", display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+              <div className="disp" style={{ fontWeight: 700, fontSize: 14.5 }}>{cat.label}</div>
+              <div className="mono" style={{ fontSize: 11, color: "#8B958E" }}>{total} staff</div>
+            </div>
+
+            {total === 0 ? (
+              <div style={{ fontSize: 12.5, color: "#B4B9B5" }}>No staff added yet.</div>
+            ) : doneToday ? (
+              <div style={{ background: "#EAF3DE", border: "1px solid #C0DD97", borderRadius: 8, padding: "9px 12px" }}>
+                <div style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: 0.5, color: "#3B6D11", fontWeight: 700 }}>On duty today</div>
+                <div className="gu" style={{ fontSize: 14.5, fontWeight: 600, marginTop: 2 }}>{doneToday.name}</div>
+              </div>
+            ) : nextUp ? (
+              <div style={{ background: "#FFFBF2", border: "1px solid #F3DDAE", borderRadius: 8, padding: "9px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                <div>
+                  <div style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: 0.5, color: "#8A5A16", fontWeight: 700 }}>Not assigned yet · next up</div>
+                  <div className="gu" style={{ fontSize: 14.5, fontWeight: 600, marginTop: 2 }}>{nextUp.name}</div>
+                </div>
+                <button onClick={() => assignDuty(cat.id, nextUp.number, nextUp.name)} style={{ background: "#D98E2B", color: "#fff", border: "none", borderRadius: 6, padding: "6px 10px", fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>Assign</button>
+              </div>
+            ) : (
+              <div style={{ background: "#FCEBEB", border: "1px solid #F7C1C1", borderRadius: 8, padding: "9px 12px", fontSize: 12.5, color: "#A32D2D" }}>No one available — all on leave, outstation, or skip.</div>
+            )}
+
+            <button onClick={() => goToCategory(cat.id)} style={{ background: "transparent", border: "none", color: "#5B6B7A", fontSize: 12, textAlign: "left", padding: 0, textDecoration: "underline", alignSelf: "flex-start" }}>View full roster →</button>
+          </div>
+        ))}
+        {cards.length === 0 && <div style={{ color: "#8B958E", fontSize: 13 }}>No work types yet — add one from the sidebar.</div>}
+      </div>
+    </React.Fragment>
+  );
+}
+
+function CategoryView({ data, catId, addToCategory, removeFromCategory, setSkip, setLastDuty, assignDuty, clearCategoryHistory, undo, redo, canUndo, canRedo }) {
+  const [newNumber, setNewNumber] = useState("");
+  const [newName, setNewName] = useState("");
+  const [newDate, setNewDate] = useState(todayStr());
+  const [editingDate, setEditingDate] = useState(null);
+  const [tab, setTab] = useState("roster"); // roster | history
+
+  const cat = data.categories.find((c) => c.id === catId);
+  const membership = data.membership[catId] || [];
+
+  const roster = useMemo(() => computeRoster(data, catId), [data, catId]);
+
+  // Every completed duty for THIS work type only, newest first — the
+  // evidence trail for who did duty and when, per work type.
+  const historyRows = useMemo(() => {
+    const rows = [];
+    membership.forEach((m) => {
+      const staffRec = data.staff[m.number];
+      (m.history || []).forEach((entry) => {
+        rows.push({
+          number: m.number,
+          name: staffRec ? staffRec.name : m.number,
+          date: historyDate(entry),
+          ts: historyTs(entry),
+        });
+      });
+    });
+    return rows.sort((a, b) => (b.date === a.date ? b.ts - a.ts : b.date.localeCompare(a.date)));
+  }, [data, membership]);
+
+  // Reset back to "roster" when switching work types, so History from the
+  // previous work type never appears to carry over.
+  useEffect(() => { setTab("roster"); }, [catId]);
+
+  const nextUp = roster.find((p) => p.rank === 1);
+  const presentCount = roster.filter((p) => p.status === "Present").length;
+  const lookupPreview = newNumber.trim() && data.staff[newNumber.trim()] ? data.staff[newNumber.trim()].name : null;
+
+  return (
+    <React.Fragment>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 4 }}>
+        <h1 className="disp" style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>{cat ? cat.label : ""}</h1>
+        <div style={{ fontSize: 12, color: "#5B6B7A" }}>{presentCount} available</div>
+      </div>
+      <p style={{ fontSize: 13, color: "#5B6B7A", margin: "0 0 16px" }}>
+        Next duty always goes to whoever has waited longest — no manual pick. Leave and outstation are set once in Manage staff and apply to every work type automatically.
+      </p>
+
+      <div style={{ display: "flex", gap: 6, marginBottom: 20, justifyContent: "space-between", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button onClick={() => setTab("roster")} style={catTabBtn(tab === "roster")}>Roster</button>
+          <button onClick={() => setTab("history")} style={catTabBtn(tab === "history")}>History{historyRows.length ? ` (${historyRows.length})` : ""}</button>
+        </div>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button onClick={undo} disabled={!canUndo} title="Undo last change (Ctrl+Z)" style={undoRedoBtn(canUndo)}>↶ Undo</button>
+          <button onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Shift+Z)" style={undoRedoBtn(canRedo)}>↷ Redo</button>
+        </div>
+      </div>
+
+      {tab === "history" ? (
+        <CategoryHistoryTable rows={historyRows} catLabel={cat ? cat.label : ""} onClearHistory={() => clearCategoryHistory(catId)} />
+      ) : (
+      <React.Fragment>
+      <div style={{
+        background: "#fff", border: "1px solid #DEE3DF", borderLeft: nextUp ? "4px solid #D98E2B" : "4px solid #DEE3DF",
+        borderRadius: 10, padding: "16px 20px", marginBottom: 22, display: "flex", alignItems: "center",
+        justifyContent: "space-between", flexWrap: "wrap", gap: 12,
+      }}>
+        {nextUp ? (
+          <React.Fragment>
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <div className="disp" style={{ width: 40, height: 40, borderRadius: "50%", background: "#FAEEDA", color: "#8A5A16", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 15 }}>1</div>
+              <div>
+                <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, color: "#8A5A16", fontWeight: 600, marginBottom: 2 }}>Next up</div>
+                <div className="gu" style={{ fontSize: 16, fontWeight: 600 }}>{nextUp.name}</div>
+                <div style={{ fontSize: 12, color: "#5B6B7A", marginTop: 2 }}>Waiting {nextUp.waiting} day{nextUp.waiting === 1 ? "" : "s"} · last duty {nextUp.lastDuty}</div>
+              </div>
+            </div>
+            <button onClick={() => assignDuty(catId, nextUp.number, nextUp.name)} style={{ background: "#D98E2B", color: "#fff", border: "none", borderRadius: 7, padding: "9px 16px", fontSize: 13, fontWeight: 600 }}>Assign duty</button>
+          </React.Fragment>
+        ) : (
+          <div style={{ fontSize: 13, color: "#5B6B7A" }}>No one available in this category — add staff or clear a Skip/Leave/Outstation status.</div>
+        )}
+      </div>
+
+      <div style={{ background: "#fff", border: "1px solid #DEE3DF", borderRadius: 10, overflow: "hidden" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <thead>
+            <tr style={{ background: "#F6F7F5", textAlign: "left" }}>
+              <th style={th}>Rank</th><th style={th}>Number</th><th style={th}>Name</th><th style={th}>Last duty</th>
+              <th style={th}>Waiting</th><th style={th}>Status</th><th style={{ ...th, textAlign: "right" }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {roster.map((p) => {
+              const sty = STATUS_STYLE[p.status] || STATUS_STYLE.Present;
+              return (
+                <tr key={p.number} style={{ borderTop: "1px solid #EEF0ED", background: p.rank === 1 ? "#FFFBF2" : "transparent" }}>
+                  <td style={td}>{p.rank ? <span className="mono" style={{ fontWeight: 600, color: p.rank === 1 ? "#8A5A16" : "#16202B" }}>#{p.rank}</span> : <span style={{ color: "#B4B9B5" }}>–</span>}</td>
+                  <td style={td} className="mono">{p.number}</td>
+                  <td style={{ ...td, minWidth: 160 }} className="gu">{p.name}</td>
+                  <td style={td}>
+                    {editingDate === p.number ? (
+                      <input type="date" defaultValue={p.lastDuty} autoFocus onBlur={(e) => { setLastDuty(catId, p.number, e.target.value); setEditingDate(null); }} onKeyDown={(e) => { if (e.key === "Enter") { setLastDuty(catId, p.number, e.target.value); setEditingDate(null); } }} />
+                    ) : (
+                      <span className="mono" onClick={() => setEditingDate(p.number)} style={{ cursor: "pointer", borderBottom: "1px dashed #B4B9B5" }} title="Click to edit">{p.lastDuty}</span>
+                    )}
+                  </td>
+                  <td style={td} className="mono">{p.waiting}d</td>
+                  <td style={td}>
+                    {p.status === "Leave" || p.status === "Outstation" ? (
+                      <span title={`${p.staffRec.unavailable.from} → ${p.staffRec.unavailable.to || "ongoing"}`} style={{ fontSize: 12, fontWeight: 600, padding: "5px 8px", borderRadius: 6, border: "1px solid " + sty.border, background: sty.bg, color: sty.fg }}>{p.statusLabel}</span>
+                    ) : (
+                      <select value={p.status} onChange={(e) => setSkip(catId, p.number, e.target.value === "Skip")} style={{
+                        fontSize: 12, fontWeight: 600, padding: "5px 8px", borderRadius: 6, border: "1px solid " + sty.border,
+                        background: sty.bg, color: sty.fg,
+                      }}>
+                        <option value="Present">Present</option>
+                        <option value="Skip">Skip</option>
+                      </select>
+                    )}
+                  </td>
+                  <td style={{ ...td, textAlign: "right" }}>
+                    <button onClick={() => assignDuty(catId, p.number, p.name)} title="Assign duty now" style={iconBtn}>✓</button>
+                    <button onClick={() => removeFromCategory(catId, p.number)} title="Remove from this work type" style={{ ...iconBtn, marginLeft: 4 }}>✕</button>
+                  </td>
+                </tr>
+              );
+            })}
+            {roster.length === 0 && (
+              <tr><td colSpan={7} style={{ ...td, textAlign: "center", color: "#8B958E", padding: "26px 0" }}>No staff added to this work type yet.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap", alignItems: "flex-start" }}>
+        <div>
+          <input type="text" placeholder="Workplace number" value={newNumber} onChange={(e) => setNewNumber(e.target.value)} style={{ width: 130 }} />
+          {lookupPreview && <div className="gu" style={{ fontSize: 11, color: "#3B6D11", marginTop: 3 }}>→ {lookupPreview}</div>}
+          {!lookupPreview && newNumber.trim() && <div style={{ fontSize: 11, color: "#8A5A16", marginTop: 3 }}>New number — enter name →</div>}
+        </div>
+        <input type="text" placeholder="Staff name" value={newName} onChange={(e) => setNewName(e.target.value)} disabled={!!lookupPreview} style={{ width: 200, background: lookupPreview ? "#F1F3F0" : "#fff" }} />
+        <input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} />
+        <button onClick={() => { addToCategory(catId, newNumber, lookupPreview || newName, newDate); setNewNumber(""); setNewName(""); setNewDate(todayStr()); }} style={{ background: "#16202B", color: "#fff", border: "none", borderRadius: 7, padding: "8px 14px", fontSize: 13, fontWeight: 600 }}>+ Add to this work type</button>
+      </div>
+      </React.Fragment>
+      )}
+    </React.Fragment>
+  );
+}
+function catTabBtn(active) {
+  return { background: active ? "#16202B" : "#fff", color: active ? "#fff" : "#5B6B7A", border: "1px solid " + (active ? "#16202B" : "#DEE3DF"), borderRadius: 7, padding: "7px 16px", fontSize: 13, fontWeight: 600 };
+}
+// Read-only, newest-first log of every completed duty for one work type —
+// kept separate per work type so it can be used as evidence for that
+// specific duty allocation without mixing in other work types.
+function CategoryHistoryTable({ rows, catLabel, onClearHistory }) {
+  return (
+    <React.Fragment>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, margin: "-8px 0 14px" }}>
+        <p style={{ fontSize: 12.5, color: "#5B6B7A", margin: 0 }}>
+          Every completed "{catLabel}" duty, most recent first. This list updates automatically whenever a duty is assigned and can be reviewed any time duty allocation is questioned.
+        </p>
+        {rows.length > 0 && (
+          <button onClick={onClearHistory} title="Clear all history entries for this work type" style={{ background: "#fff", color: "#A32D2D", border: "1px solid #F0C6C6", borderRadius: 7, padding: "6px 12px", fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>
+            Clear history
+          </button>
+        )}
+      </div>
+      <div style={{ background: "#fff", border: "1px solid #DEE3DF", borderRadius: 10, overflow: "hidden" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <thead>
+            <tr style={{ background: "#F6F7F5", textAlign: "left" }}>
+              <th style={th}>#</th><th style={th}>Date</th><th style={th}>Number</th><th style={th}>Name</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={r.number + "-" + r.date + "-" + r.ts + "-" + i} style={{ borderTop: "1px solid #EEF0ED", background: i === 0 ? "#FFFBF2" : "transparent" }}>
+                <td style={td} className="mono">{i + 1}</td>
+                <td style={td} className="mono">{r.date}</td>
+                <td style={td} className="mono">{r.number}</td>
+                <td style={{ ...td, minWidth: 160 }} className="gu">{r.name}</td>
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr><td colSpan={4} style={{ ...td, textAlign: "center", color: "#8B958E", padding: "26px 0" }}>No duty has been completed in this work type yet.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </React.Fragment>
+  );
+}
+
+function StaffView({
+  data, createStaff, renameStaff, deleteStaffGlobally, setUnavailable, clearUnavailable,
+  renameLeaveType, renameOutstationType,
+  addLeaveType, deleteLeaveType, toggleLeaveTypeIndefinite,
+  addOutstationType, deleteOutstationType,
+}) {
+  const [num, setNum] = useState("");
+  const [name, setName] = useState("");
+  const [search, setSearch] = useState("");
+  const [modalFor, setModalFor] = useState(null); // staff number currently editing leave/outstation
+  const [modalKind, setModalKind] = useState("Leave");
+  const [modalTypeId, setModalTypeId] = useState("");
+  const [modalFrom, setModalFrom] = useState(todayStr());
+  const [modalTo, setModalTo] = useState(todayStr());
+  const [newLeaveLabel, setNewLeaveLabel] = useState("");
+  const [newLeaveIndefinite, setNewLeaveIndefinite] = useState(false);
+  const [newOutLabel, setNewOutLabel] = useState("");
+
+  const leaveTypes = data.leaveTypes || DEFAULT_LEAVE_TYPES;
+  const outstationTypes = data.outstationTypes || DEFAULT_OUTSTATION_TYPES;
+
+  const staffList = useMemo(() => {
+    const catByNumber = {};
+    data.categories.forEach((c) => (data.membership[c.id] || []).forEach((m) => {
+      (catByNumber[m.number] = catByNumber[m.number] || []).push(c.label);
+    }));
+    return Object.values(data.staff).sort((a, b) => a.name.localeCompare(b.name)).map((s) => ({ ...s, cats: catByNumber[s.number] || [] }));
+  }, [data]);
+
+  const filteredStaffList = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return staffList;
+    return staffList.filter((s) => s.number.toLowerCase().includes(q) || (s.name || "").toLowerCase().includes(q));
+  }, [staffList, search]);
+
+  const openModal = (s) => { setModalFor(s.number); setModalKind("Leave"); setModalTypeId(leaveTypes[0] ? leaveTypes[0].id : ""); setModalFrom(todayStr()); setModalTo(todayStr()); };
+
+  const modalTypeList = modalKind === "Leave" ? leaveTypes : outstationTypes;
+  const selectedType = modalTypeList.find((t) => t.id === modalTypeId);
+  const modalIsIndefinite = modalKind === "Leave" && !!(selectedType && selectedType.indefinite);
+
+  return (
+    <React.Fragment>
+      <h1 className="disp" style={{ fontSize: 22, fontWeight: 700, margin: "0 0 4px" }}>Manage staff</h1>
+      <p style={{ fontSize: 13, color: "#5B6B7A", margin: "0 0 20px" }}>
+        Each person has one workplace number shared across every work type. Leave and outstation set here apply everywhere automatically. Add, edit (✎), or delete (✕) leave/outstation types below — changes apply instantly to anyone currently marked with them.
+      </p>
+
+      <div style={{ marginBottom: 12 }}>
+        <input
+          type="text"
+          placeholder="Search by બકલ નંબર (workplace number) or name…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="gu"
+          style={{ width: "100%", maxWidth: 380, fontSize: 13 }}
+        />
+      </div>
+
+      <div style={{ background: "#fff", border: "1px solid #DEE3DF", borderRadius: 10, overflow: "hidden", marginBottom: 20 }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <thead>
+            <tr style={{ background: "#F6F7F5", textAlign: "left" }}>
+              <th style={th}>Number</th><th style={th}>Name</th><th style={th}>Work types</th><th style={th}>Status</th><th style={{ ...th, textAlign: "right" }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredStaffList.map((s) => {
+              const active = s.unavailable && (!s.unavailable.to || s.unavailable.to >= todayStr());
+              const kind = active ? unavailKind(s.unavailable) : "Present";
+              const label = active ? unavailLabel(data, s.unavailable) : "Present";
+              const sty = STATUS_STYLE[kind] || STATUS_STYLE.Present;
+              return (
+                <tr key={s.number} style={{ borderTop: "1px solid #EEF0ED" }}>
+                  <td style={td} className="mono">{s.number}</td>
+                  <td style={{ ...td, minWidth: 160 }} className="gu">{s.name}</td>
+                  <td style={{ ...td, fontSize: 12, color: "#5B6B7A" }}>{s.cats.join(", ") || "—"}</td>
+                  <td style={td}>
+                    <span style={{ fontSize: 12, fontWeight: 600, padding: "5px 8px", borderRadius: 6, border: "1px solid " + sty.border, background: sty.bg, color: sty.fg }}>{label}</span>
+                    {s.unavailable && (
+                      <div style={{ fontSize: 11, color: "#8B958E", marginTop: 3 }}>
+                        {s.unavailable.to ? `until ${s.unavailable.to}` : `from ${s.unavailable.from} · no end date`}
+                      </div>
+                    )}
+                  </td>
+                  <td style={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}>
+                    {s.unavailable
+                      ? <button onClick={() => clearUnavailable(s.number)} style={iconBtnWide}>End now</button>
+                      : <button onClick={() => openModal(s)} style={iconBtnWide}>Set leave/outstation</button>}
+                    <button onClick={() => renameStaff(s.number)} title="Edit name" style={{ ...iconBtn, marginLeft: 4 }}>✎</button>
+                    <button onClick={() => deleteStaffGlobally(s.number)} title="Remove entirely" style={{ ...iconBtn, marginLeft: 4 }}>✕</button>
+                  </td>
+                </tr>
+              );
+            })}
+            {filteredStaffList.length === 0 && (
+              <tr><td colSpan={5} style={{ ...td, textAlign: "center", color: "#8B958E", padding: "26px 0" }}>{staffList.length === 0 ? "No staff yet." : "No match for that search."}</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 20 }}>
+        <input type="text" placeholder="Workplace number" value={num} onChange={(e) => setNum(e.target.value)} style={{ width: 150 }} />
+        <input type="text" placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} style={{ width: 220 }} />
+        <button onClick={() => { createStaff(num, name); setNum(""); setName(""); }} style={{ background: "#16202B", color: "#fff", border: "none", borderRadius: 7, padding: "8px 14px", fontSize: 13, fontWeight: 600 }}>+ Add to staff directory</button>
+      </div>
+
+      <div style={{ background: "#fff", border: "1px solid #DEE3DF", borderRadius: 10, padding: "16px 18px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 20 }}>
+        <div>
+          <div className="disp" style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>Leave types</div>
+          {leaveTypes.map((t) => (
+            <div key={t.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0", borderTop: "1px solid #EEF0ED", gap: 8 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 13 }}>{t.label}</div>
+              </div>
+              <div style={{ display: "flex", gap: 4, alignItems: "center", flexShrink: 0 }}>
+                <button
+                  onClick={() => toggleLeaveTypeIndefinite(t.id)}
+                  title="Toggle: indefinite (start date only, no fixed end) vs fixed duration"
+                  style={{
+                    ...iconBtn, fontSize: 10.5, padding: "4px 7px", fontWeight: 600,
+                    background: t.indefinite ? "#DCE8F5" : "transparent",
+                    color: t.indefinite ? "#1D4E89" : "#8B958E",
+                    borderColor: t.indefinite ? "#A9C6E8" : "#DEE3DF",
+                  }}
+                >{t.indefinite ? "No end date" : "Fixed dates"}</button>
+                <button onClick={() => renameLeaveType(t.id)} title="Edit" style={iconBtn}>✎</button>
+                <button onClick={() => deleteLeaveType(t.id)} title="Delete" style={iconBtn}>✕</button>
+              </div>
+            </div>
+          ))}
+          <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 10, flexWrap: "wrap" }}>
+            <input type="text" placeholder="New leave type" value={newLeaveLabel} onChange={(e) => setNewLeaveLabel(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { addLeaveType(newLeaveLabel, newLeaveIndefinite); setNewLeaveLabel(""); setNewLeaveIndefinite(false); } }}
+              style={{ flex: 1, minWidth: 120, fontSize: 12 }} />
+            <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "#5B6B7A", whiteSpace: "nowrap" }}>
+              <input type="checkbox" checked={newLeaveIndefinite} onChange={(e) => setNewLeaveIndefinite(e.target.checked)} />
+              No end date
+            </label>
+            <button onClick={() => { addLeaveType(newLeaveLabel, newLeaveIndefinite); setNewLeaveLabel(""); setNewLeaveIndefinite(false); }} style={{ background: "#D98E2B", color: "#fff", border: "none", borderRadius: 6, padding: "6px 10px", fontSize: 12, fontWeight: 600 }}>+ Add</button>
+          </div>
+        </div>
+        <div>
+          <div className="disp" style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>Outstation types</div>
+          {outstationTypes.map((t) => (
+            <div key={t.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0", borderTop: "1px solid #EEF0ED", gap: 8 }}>
+              <span style={{ fontSize: 13 }}>{t.label}</span>
+              <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                <button onClick={() => renameOutstationType(t.id)} title="Edit" style={iconBtn}>✎</button>
+                <button onClick={() => deleteOutstationType(t.id)} title="Delete" style={iconBtn}>✕</button>
+              </div>
+            </div>
+          ))}
+          <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 10 }}>
+            <input type="text" placeholder="New outstation type" value={newOutLabel} onChange={(e) => setNewOutLabel(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { addOutstationType(newOutLabel); setNewOutLabel(""); } }}
+              style={{ flex: 1, minWidth: 120, fontSize: 12 }} />
+            <button onClick={() => { addOutstationType(newOutLabel); setNewOutLabel(""); }} style={{ background: "#D98E2B", color: "#fff", border: "none", borderRadius: 6, padding: "6px 10px", fontSize: 12, fontWeight: 600 }}>+ Add</button>
+          </div>
+        </div>
+      </div>
+
+      {modalFor && (
+        <div style={{ position: "fixed", inset: 0, background: "#00000055", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10 }}>
+          <div style={{ background: "#fff", borderRadius: 10, padding: 22, width: 320 }}>
+            <div className="disp" style={{ fontWeight: 700, fontSize: 15, marginBottom: 12 }}>Mark {data.staff[modalFor].name}</div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+              <button onClick={() => { setModalKind("Leave"); setModalTypeId(leaveTypes[0] ? leaveTypes[0].id : ""); }} style={{ flex: 1, padding: "7px 0", borderRadius: 6, border: "1px solid #DEE3DF", background: modalKind === "Leave" ? "#DCE8F5" : "#fff", fontWeight: 600, fontSize: 12 }}>Leave</button>
+              <button onClick={() => { setModalKind("Outstation"); setModalTypeId(outstationTypes[0] ? outstationTypes[0].id : ""); }} style={{ flex: 1, padding: "7px 0", borderRadius: 6, border: "1px solid #DEE3DF", background: modalKind === "Outstation" ? "#EFE5F7" : "#fff", fontWeight: 600, fontSize: 12 }}>Outstation</button>
+            </div>
+            <label style={{ fontSize: 12, color: "#5B6B7A" }}>Type</label>
+            <select value={modalTypeId} onChange={(e) => setModalTypeId(e.target.value)} style={{ width: "100%", marginBottom: 8, marginTop: 3, padding: "7px 10px", border: "1px solid #DEE3DF", borderRadius: 6, fontSize: 13, background: "#fff" }}>
+              {modalTypeList.map((t) => (
+                <option key={t.id} value={t.id}>{t.label}{modalKind === "Leave" && t.indefinite ? " (no end date)" : ""}</option>
+              ))}
+            </select>
+            <label style={{ fontSize: 12, color: "#5B6B7A" }}>From</label>
+            <input type="date" value={modalFrom} onChange={(e) => setModalFrom(e.target.value)} style={{ width: "100%", marginBottom: 8, marginTop: 3 }} />
+            {modalIsIndefinite ? (
+              <div style={{ fontSize: 11.5, color: "#5B6B7A", background: "#F6F7F5", border: "1px solid #EEF0ED", borderRadius: 6, padding: "8px 10px", marginBottom: 16 }}>
+                This type has no fixed end date — {data.staff[modalFor].name} will stay marked "{selectedType.label}" until you press <strong>End now</strong> for them.
+              </div>
+            ) : (
+              <React.Fragment>
+                <label style={{ fontSize: 12, color: "#5B6B7A" }}>To</label>
+                <input type="date" value={modalTo} onChange={(e) => setModalTo(e.target.value)} style={{ width: "100%", marginBottom: 16, marginTop: 3 }} />
+              </React.Fragment>
+            )}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button onClick={() => setModalFor(null)} style={{ background: "transparent", border: "1px solid #DEE3DF", borderRadius: 7, padding: "8px 14px", fontSize: 13 }}>Cancel</button>
+              <button onClick={() => { setUnavailable(modalFor, modalKind, modalTypeId, modalFrom, modalTo); setModalFor(null); }} style={{ background: "#D98E2B", color: "#fff", border: "none", borderRadius: 7, padding: "8px 14px", fontSize: 13, fontWeight: 600 }}>Save</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </React.Fragment>
+  );
+}
+
+function ReportView({ data }) {
+  const [month, setMonth] = useState(todayStr().slice(0, 7));
+  const [pdfLang, setPdfLang] = useState("en");
+  const [pdfBusy, setPdfBusy] = useState(false);
+
+  const rows = useMemo(() => {
+    const out = [];
+    data.categories.forEach((c) => {
+      (data.membership[c.id] || []).forEach((m) => {
+        const staffRec = data.staff[m.number];
+        if (!staffRec) return;
+        (m.history || []).forEach((entry) => {
+          const date = historyDate(entry);
+          if (date.slice(0, 7) === month) out.push({ name: staffRec.name, category: c.label, date });
+        });
+      });
+    });
+    return out.sort((a, b) => a.name.localeCompare(b.name) || a.date.localeCompare(b.date));
+  }, [data, month]);
+
+  const grouped = useMemo(() => {
+    const g = {};
+    rows.forEach((r) => { (g[r.name] = g[r.name] || []).push(r); });
+    return g;
+  }, [rows]);
+
+  const monthLabel = new Date(month + "-01T00:00:00").toLocaleDateString(undefined, { month: "long", year: "numeric" });
+
+  const downloadPdf = async () => {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const useGujarati = pdfLang === "gu";
+    const GU_FONT = "NotoSansGujarati";
+
+    if (useGujarati) {
+      setPdfBusy(true);
+      try {
+        const base64 = await loadGujaratiFont();
+        doc.addFileToVFS("NotoSansGujarati-Regular.ttf", base64);
+        doc.addFont("NotoSansGujarati-Regular.ttf", GU_FONT, "normal");
+      } catch (e) {
+        setPdfBusy(false);
+        window.alert("Could not load Gujarati font — check your internet connection and try again.");
+        return;
+      }
+      setPdfBusy(false);
+    }
+
+    doc.setFontSize(14);
+    doc.text("Nokri Book — Monthly Duty Report", 14, 16);
+    doc.setFontSize(10);
+    doc.text(monthLabel, 14, 23);
+    doc.setFontSize(8.5);
+    doc.text("Generated " + new Date().toLocaleString(), 14, 28);
+    doc.autoTable({
+      startY: 33,
+      head: [["#", "Name", "Work type", "Date"]],
+      body: rows.map((r, i) => [i + 1, r.name, r.category, r.date]),
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [14, 22, 32] },
+      // Only the Name column (index 1) needs the Gujarati font — everything
+      // else (headers, work type, date) stays on the normal PDF font.
+      didParseCell: (hookData) => {
+        if (useGujarati && hookData.section === "body" && hookData.column.index === 1) {
+          hookData.cell.styles.font = GU_FONT;
+        }
+      },
+    });
+    doc.save(`nokri-book-report-${month}${useGujarati ? "-gu" : ""}.pdf`);
+  };
+
+  return (
+    <React.Fragment>
+      <h1 className="disp" style={{ fontSize: 22, fontWeight: 700, margin: "0 0 4px" }}>Monthly report</h1>
+      <p style={{ fontSize: 13, color: "#5B6B7A", margin: "0 0 20px" }}>
+        Shows every duty completed in the selected month, by name and work type. Workplace numbers are never included in the report.
+      </p>
+
+      <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 18, flexWrap: "wrap" }}>
+        <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+        <select value={pdfLang} onChange={(e) => setPdfLang(e.target.value)} style={{ border: "1px solid #DEE3DF", borderRadius: 6, padding: "7px 10px", fontSize: 13, background: "#fff", color: "#16202B" }}>
+          <option value="en">PDF: English</option>
+          <option value="gu">PDF: Gujarati names</option>
+        </select>
+        <button onClick={downloadPdf} disabled={rows.length === 0 || pdfBusy} style={{ background: rows.length && !pdfBusy ? "#D98E2B" : "#DEE3DF", color: "#fff", border: "none", borderRadius: 7, padding: "8px 16px", fontSize: 13, fontWeight: 600 }}>{pdfBusy ? "Preparing…" : "Download PDF"}</button>
+        <div style={{ fontSize: 12, color: "#5B6B7A" }}>{rows.length} duty record{rows.length === 1 ? "" : "s"} in {monthLabel}</div>
+      </div>
+
+      <div style={{ background: "#fff", border: "1px solid #DEE3DF", borderRadius: 10, overflow: "hidden" }}>
+        {Object.keys(grouped).length === 0 ? (
+          <div style={{ padding: "26px 0", textAlign: "center", color: "#8B958E", fontSize: 13 }}>No duty recorded for {monthLabel} yet.</div>
+        ) : Object.keys(grouped).sort().map((name) => (
+          <div key={name} style={{ borderTop: "1px solid #EEF0ED", padding: "12px 18px" }}>
+            <div className="gu" style={{ fontWeight: 600, fontSize: 14, marginBottom: 5 }}>{name}</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {grouped[name].map((r, i) => (
+                <span key={i} className="mono" style={{ fontSize: 11.5, background: "#F6F7F5", border: "1px solid #EEF0ED", borderRadius: 5, padding: "3px 8px" }}>{r.category} · {r.date}</span>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </React.Fragment>
+  );
+}
+
+const RECYCLE_TYPE_META = {
+  category: { icon: "📁", label: "Work type" },
+  staff: { icon: "🧑", label: "Staff" },
+  membership: { icon: "📋", label: "Roster entry" },
+  history: { icon: "🕓", label: "History" },
+};
+
+function RecycleBinView({ data, onRestore, onDeleteForever, onEmpty }) {
+  const items = data.recycleBin || [];
+  return (
+    <React.Fragment>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 4 }}>
+        <h1 className="disp" style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Recycle bin</h1>
+        {items.length > 0 && (
+          <button onClick={onEmpty} style={{ background: "#fff", color: "#A32D2D", border: "1px solid #F0C6C6", borderRadius: 7, padding: "7px 14px", fontSize: 12.5, fontWeight: 600 }}>Empty recycle bin</button>
+        )}
+      </div>
+      <p style={{ fontSize: 13, color: "#5B6B7A", margin: "0 0 20px" }}>
+        Deleted work types, staff, roster entries, and cleared history land here instead of disappearing. Restore anything back, or delete it forever.
+      </p>
+
+      {items.length === 0 ? (
+        <div style={{ background: "#fff", border: "1px solid #DEE3DF", borderRadius: 10, padding: "30px 0", textAlign: "center", color: "#8B958E", fontSize: 13 }}>
+          Nothing in the recycle bin.
+        </div>
+      ) : (
+        <div style={{ background: "#fff", border: "1px solid #DEE3DF", borderRadius: 10, overflow: "hidden" }}>
+          {items.map((item, i) => {
+            const meta = RECYCLE_TYPE_META[item.type] || { icon: "🗑️", label: item.type };
+            return (
+              <div key={item.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 18px", borderTop: i === 0 ? "none" : "1px solid #EEF0ED", flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+                  <span style={{ fontSize: 18 }}>{meta.icon}</span>
+                  <div style={{ minWidth: 0 }}>
+                    <div className="gu" style={{ fontSize: 13.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.label}</div>
+                    <div style={{ fontSize: 11.5, color: "#8B958E", marginTop: 2 }}>{meta.label} · deleted {item.deletedAt}</div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                  <button onClick={() => onRestore(item.id)} style={{ background: "#16202B", color: "#fff", border: "none", borderRadius: 6, padding: "6px 12px", fontSize: 12, fontWeight: 600 }}>Restore</button>
+                  <button onClick={() => onDeleteForever(item.id)} style={{ background: "#fff", color: "#A32D2D", border: "1px solid #F0C6C6", borderRadius: 6, padding: "6px 12px", fontSize: 12, fontWeight: 600 }}>Delete forever</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </React.Fragment>
+  );
+}
+
+const th = { padding: "9px 14px", fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5, color: "#5B6B7A", fontWeight: 600 };
+const td = { padding: "10px 14px", verticalAlign: "middle" };
+const iconBtn = { background: "transparent", border: "1px solid #DEE3DF", borderRadius: 6, padding: "5px 7px", color: "#5B6B7A" };
+const iconBtnWide = { background: "transparent", border: "1px solid #DEE3DF", borderRadius: 6, padding: "5px 9px", color: "#5B6B7A", fontSize: 12 };
+
+ReactDOM.createRoot(document.getElementById("root")).render(<DutyRoster />);
+</script>
+
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("./service-worker.js").catch((e) => console.warn("SW registration failed", e));
+    });
+  }
+</script>
+</body>
+</html>
